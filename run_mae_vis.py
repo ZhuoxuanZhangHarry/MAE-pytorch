@@ -67,6 +67,16 @@ def get_model(args):
 
     return model
 
+def compute_pixelwise_accuracy(original, reconstructed, threshold=0.05):
+    abs_diff = torch.abs(original - reconstructed)
+
+    correct_pixels = (abs_diff < threshold).float().sum()
+    total_pixels = torch.numel(original)
+
+    accuracy = correct_pixels / total_pixels
+    
+    return accuracy.item()
+
 
 def main(args):
     print(args)
@@ -126,6 +136,14 @@ def main(args):
         rec_img = rearrange(rec_img, 'b (h w) (p1 p2) c -> b c (h p1) (w p2)', p1=patch_size[0], p2=patch_size[1], h=14, w=14)
         img = ToPILImage()(rec_img[0, :].clip(0,0.996))
         img.save(f"{args.save_path}/rec_img.jpg")
+        
+        # Compute accuracy
+        accuracy = compute_pixelwise_accuracy(ori_img, rec_img)
+        print(f"Accuracy: {accuracy:.4f}")
+
+        # Compute the MSE loss between the original and reconstructed image
+        mse_loss = torch.nn.MSELoss()(ori_img, rec_img)
+        print("MSE Loss:", mse_loss.item())
 
         #save random mask img
         img_mask = rec_img * mask
