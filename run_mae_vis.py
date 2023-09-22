@@ -121,6 +121,7 @@ def main(args):
         img_squeeze = rearrange(ori_img, 'b c (h p1) (w p2) -> b (h w) (p1 p2) c', p1=patch_size[0], p2=patch_size[0])
         img_norm = (img_squeeze - img_squeeze.mean(dim=-2, keepdim=True)) / (img_squeeze.var(dim=-2, unbiased=True, keepdim=True).sqrt() + 1e-6)
         img_patch = rearrange(img_norm, 'b n p c -> b n (p c)')
+        #updating the masked patches in img_patch with the reconstructed patches from the model's outputs.
         img_patch[bool_masked_pos] = outputs
 
         #make mask
@@ -137,18 +138,29 @@ def main(args):
         img = ToPILImage()(rec_img[0, :].clip(0,0.996))
         img.save(f"{args.save_path}/rec_img.jpg")
         
-        # Compute accuracy
-        accuracy = compute_pixelwise_accuracy(ori_img, rec_img)
-        print(f"Accuracy: {accuracy:.4f}")
 
-        # Compute the MSE loss between the original and reconstructed image
-        mse_loss = torch.nn.MSELoss()(ori_img, rec_img)
-        print("MSE Loss:", mse_loss.item())
+        #save reconstruction img
+        rec_img = rearrange(img_patch, 'b n (p c) -> b n p c', c=3)
+        rec_img = rec_img * (img_squeeze.var(dim=-2, unbiased=True, keepdim=True).sqrt() + 1e-6) + img_squeeze.mean(dim=-2, keepdim=True)
+        rec_img = rearrange(rec_img, 'b (h w) (p1 p2) c -> b c (h p1) (w p2)', p1=patch_size[0], p2=patch_size[1], h=14, w=14)
+        img = ToPILImage()(rec_img[0, :].clip(0,0.996))
+        img.save(f"{args.save_path}/rec_img.jpg")
 
-        #save random mask img
-        img_mask = rec_img * mask
-        img = ToPILImage()(img_mask[0, :])
-        img.save(f"{args.save_path}/mask_img.jpg")
+        #calculate accuracy
+        print("Accuracy: ", compute_pixelwise_accuracy(ori_img, rec_img))
+
+        # calculate MSE for each patch
+        mse_losses = []
+        for i in range(0, rec_img.shape[2], patch_size[0]):
+            for j in range(0, rec_img.shape[3], patch_size[1]):
+                patch_ori = ori_img[:, :, i:i+patch_size[0], j:j+patch_size[1]]
+                patch_rec = rec_img[:, :, i:i+patch_size[0], j:j+patch_size[1]]
+                
+                mse = ((patch_ori - patch_rec) ** 2).mean().item()
+                mse_losses.append(mse)
+        print("MSE for each patch:", mse_losses)
+
+
 
 if __name__ == '__main__':
     opts = get_args()
