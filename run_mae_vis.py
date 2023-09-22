@@ -126,6 +126,7 @@ def main(args):
         img_norm = (img_squeeze - img_squeeze.mean(dim=-2, keepdim=True)) / (img_squeeze.var(dim=-2, unbiased=True, keepdim=True).sqrt() + 1e-6)
         img_patch = rearrange(img_norm, 'b n p c -> b n (p c)')
         #updating the masked patches in img_patch with the reconstructed patches from the model's outputs.
+        # if 
         img_patch[bool_masked_pos] = outputs
 
         #make mask
@@ -141,19 +142,35 @@ def main(args):
         rec_img = rearrange(rec_img, 'b (h w) (p1 p2) c -> b c (h p1) (w p2)', p1=patch_size[0], p2=patch_size[1], h=14, w=14)
         img = ToPILImage()(rec_img[0, :].clip(0,0.996))
         img.save(f"{args.save_path}/rec_img.jpg")
-        
 
-        #save reconstruction img
-        rec_img = rearrange(img_patch, 'b n (p c) -> b n p c', c=3)
-        rec_img = rec_img * (img_squeeze.var(dim=-2, unbiased=True, keepdim=True).sqrt() + 1e-6) + img_squeeze.mean(dim=-2, keepdim=True)
-        rec_img = rearrange(rec_img, 'b (h w) (p1 p2) c -> b c (h p1) (w p2)', p1=patch_size[0], p2=patch_size[1], h=14, w=14)
-        img = ToPILImage()(rec_img[0, :].clip(0,0.996))
-        img.save(f"{args.save_path}/rec_img.jpg")
+         #save random mask img
+        mask_img = rec_img * mask
+        img = ToPILImage()(mask_img[0, :])
+        img.save(f"{args.save_path}/mask_img.jpg")
 
         #calculate accuracy
         print("Accuracy: ", compute_pixelwise_accuracy(ori_img, rec_img))
 
-        # calculate MSE for each patch
+        # calculate MSE for each patch: mask_img vs ori_img
+        mse_losses = []
+        for i in range(0, mask_img.shape[2], patch_size[0]):
+            for j in range(0, mask_img.shape[3], patch_size[1]):
+                patch_ori = ori_img[:, :, i:i+patch_size[0], j:j+patch_size[1]]
+                patch_mask = mask_img[:, :, i:i+patch_size[0], j:j+patch_size[1]]
+                
+                mse = ((patch_ori - patch_mask) ** 2).mean().item()
+                mse_losses.append(mse)
+
+        # plot the MSE for each patch
+        plt.figure(figsize=(10, 6))
+        plt.plot(mse_losses, marker='o')
+        plt.title('Mean Squared Error for Each Patch: mask_img vs ori_img')
+        plt.xlabel('Patch Index')
+        plt.ylabel('MSE')
+        plt.grid(True)
+        plt.savefig("out/mse_plot_mask.png", bbox_inches='tight', dpi=300)
+
+        # calculate MSE for each patch: rec_img vs ori_img
         mse_losses = []
         for i in range(0, rec_img.shape[2], patch_size[0]):
             for j in range(0, rec_img.shape[3], patch_size[1]):
@@ -162,16 +179,17 @@ def main(args):
                 
                 mse = ((patch_ori - patch_rec) ** 2).mean().item()
                 mse_losses.append(mse)
-        # print("MSE for each patch:", mse_losses)
 
-        # Plotting the MSE for each patch
+        # plot the MSE for each patch
         plt.figure(figsize=(10, 6))
         plt.plot(mse_losses, marker='o')
-        plt.title('Mean Squared Error for Each Patch')
+        plt.title('Mean Squared Error for Each Patch: rec_img vs ori_img')
         plt.xlabel('Patch Index')
         plt.ylabel('MSE')
         plt.grid(True)
-        plt.savefig("out/mse_plot.png", bbox_inches='tight', dpi=300)
+        plt.savefig("out/mse_plot_rec.png", bbox_inches='tight', dpi=300)
+
+
 
 
 if __name__ == '__main__':
