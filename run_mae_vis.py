@@ -20,6 +20,10 @@ import torch.backends.cudnn as cudnn
 import json
 import os
 
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+
 from PIL import Image
 
 from pathlib import Path
@@ -158,8 +162,16 @@ def main(args):
                 
                 mse = ((patch_ori - patch_rec) ** 2).mean().item()
                 mse_losses.append(mse)
-        print("MSE for each patch:", mse_losses)
+        # print("MSE for each patch:", mse_losses)
 
+        # Plotting the MSE for each patch
+        plt.figure(figsize=(10, 6))
+        plt.plot(mse_losses, marker='o')
+        plt.title('Mean Squared Error for Each Patch')
+        plt.xlabel('Patch Index')
+        plt.ylabel('MSE')
+        plt.grid(True)
+        plt.savefig("out/mse_plot.png", bbox_inches='tight', dpi=300)
 
 
 if __name__ == '__main__':
