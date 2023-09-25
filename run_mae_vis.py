@@ -81,6 +81,22 @@ def compute_pixelwise_accuracy(original, reconstructed, threshold=0.05):
     
     return accuracy.item()
 
+def compute_mse_for_masked_patches(ori_img, compare_img, bool_masked_pos, patch_size):
+    mse_losses = []
+    
+    masked_indices = torch.where(bool_masked_pos == True)
+    
+    for idx in zip(masked_indices[0], masked_indices[1]):
+        i = (idx[1] // (ori_img.shape[3] // patch_size[1])) * patch_size[0]
+        j = (idx[1] % (ori_img.shape[3] // patch_size[1])) * patch_size[1]
+
+        patch_ori = ori_img[0, :, i:i+patch_size[0], j:j+patch_size[1]]
+        patch_compare = compare_img[0, :, i:i+patch_size[0], j:j+patch_size[1]]
+
+        mse = ((patch_ori - patch_compare) ** 2).mean().item()
+        mse_losses.append(mse)
+
+    return mse_losses
 
 def main(args):
     print(args)
@@ -189,7 +205,29 @@ def main(args):
         plt.grid(True)
         plt.savefig("out/mse_plot_rec.png", bbox_inches='tight', dpi=300)
 
+        # Calculate MSE for masked patches: mask_img vs ori_img
+        mse_masked_losses = compute_mse_for_masked_patches(ori_img, mask_img, bool_masked_pos, patch_size)
 
+        # Plot the MSE for masked patches
+        plt.figure(figsize=(10, 6))
+        plt.plot(mse_masked_losses, marker='o')
+        plt.title('MSE for Masked Patches: mask_img vs ori_img')
+        plt.xlabel('Masked Patch Index')
+        plt.ylabel('MSE')
+        plt.grid(True)
+        plt.savefig(f"{args.save_path}/mse_plot_masked_patches.png", bbox_inches='tight', dpi=300)
+
+        # Calculate MSE for masked patches: rec_img vs ori_img
+        mse_reconstructed_losses = compute_mse_for_masked_patches(ori_img, rec_img, bool_masked_pos, patch_size)
+
+        # Plot the MSE for masked patches
+        plt.figure(figsize=(10, 6))
+        plt.plot(mse_reconstructed_losses, marker='o')
+        plt.title('MSE for Masked Patches: rec_img vs ori_img')
+        plt.xlabel('Masked Patch Index')
+        plt.ylabel('MSE')
+        plt.grid(True)
+        plt.savefig(f"{args.save_path}/mse_plot_reconstructed_patches.png", bbox_inches='tight', dpi=300)
 
 
 if __name__ == '__main__':

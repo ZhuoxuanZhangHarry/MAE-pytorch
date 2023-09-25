@@ -26,9 +26,7 @@ class DataAugmentationForMAE(object):
         std = IMAGENET_INCEPTION_STD if not imagenet_default_mean_and_std else IMAGENET_DEFAULT_STD
 
         self.transform = transforms.Compose([
-            transforms.Resize(args.resize),
-            transforms.CenterCrop(args.crop),
-            # transforms.RandomResizedCrop(args.input_size),
+            transforms.RandomResizedCrop(args.input_size),
             transforms.ToTensor(),
             transforms.Normalize(
                 mean=torch.tensor(mean),
