@@ -84,20 +84,9 @@ def compute_pixelwise_accuracy(original, reconstructed, threshold=0.05):
     return accuracy.item()
 
 def calculate_patchwise_mse(ori_img, mask_img, patch_size):
-    """
-    Calculate Mean Squared Error (MSE) for each patch between the original image and the masked image.
-    
-    Parameters:
-    - ori_img (torch.Tensor): The original image tensor.
-    - mask_img (torch.Tensor): The masked image tensor.
-    - patch_size (tuple): The height and width of the patches.
-    
-    Returns:
-    - list: A list of MSE values for each patch.
-    """
-    
+    """Calculate Mean Squared Error for each patch."""
     mse_losses = []
-    
+    patch_indexes = []
     for i in range(0, ori_img.shape[2], patch_size[0]):
         for j in range(0, ori_img.shape[3], patch_size[1]):
             patch_ori = ori_img[:, :, i:i+patch_size[0], j:j+patch_size[1]]
@@ -105,57 +94,65 @@ def calculate_patchwise_mse(ori_img, mask_img, patch_size):
             
             mse = ((patch_ori - patch_mask) ** 2).mean().item()
             mse_losses.append(mse)
+            patch_indexes.append((i, j))
     
-    return mse_losses
+    # Get indexes of patches with top 7.5% highest MSE
+    top_mse_count = int(0.075 * len(mse_losses))
+    top_mse_indexes = sorted(range(len(mse_losses)), key=lambda i: mse_losses[i], reverse=True)[:top_mse_count]
+    top_patch_indexes = [patch_indexes[i] for i in top_mse_indexes]
+    
+    return mse_losses, top_patch_indexes
 
-import matplotlib.pyplot as plt
 
-def plot_mse_per_patch(mse_losses, save_path, title):
-    """
-    Plot Mean Squared Error (MSE) for each patch and save the plot.
-    
-    Parameters:
-    - mse_losses (list): List of MSE values for each patch.
-    - save_path (str): File path to save the plot.
-    
-    """
-    
+def plot_mse_per_patch(mse_losses, top_patch_indexes, save_path, title):
+    """Plot Mean Squared Error for each patch."""
     plt.figure(figsize=(10, 6))
     plt.plot(mse_losses, marker='o')
+    
+    # Highlight the patches with the highest MSE
+    x_index = [x[0] for x in top_patch_indexes]
+    plt.axvline(x=min(x_index), color='red', linestyle='--')
+    plt.axvline(x=max(x_index), color='red', linestyle='--')
+
     plt.title(title)
     plt.xlabel('Patch Index')
     plt.ylabel('MSE')
     plt.grid(True)
     plt.savefig(save_path, bbox_inches='tight', dpi=300)
 
+
 def assessment(ori_img, attacked_img, mask_img, rec_img, patch_size):
- #calculate accuracy
-        print("Accuracy: ", compute_pixelwise_accuracy(ori_img, rec_img))
+    #calculate accuracy
+    print("Accuracy: ", compute_pixelwise_accuracy(ori_img, rec_img))
 
-        #calculate MSE for each patch: attacked_img vs ori_img
-        mse_losses = calculate_patchwise_mse(ori_img, attacked_img, patch_size)
+    # calculate MSE for each patch: attacked_img vs ori_img
+    mse_losses, top_patch_indexes = calculate_patchwise_mse(ori_img, attacked_img, patch_size)
+    print("Average MSE loss (attacked_img vs ori_img):", np.mean(mse_losses))  # <-- printing average
         
-        #plot MSE for attacked_img vs ori_img
-        plot_mse_per_patch(mse_losses, save_path='out/attacked_vs_ori.png', title='Mean Squared Error for Each Patch: attacked_img vs ori_img')
+    # plot MSE for attacked_img vs ori_img
+    plot_mse_per_patch(mse_losses, top_patch_indexes, save_path='out/attacked_vs_ori.png', title='Mean Squared Error for Each Patch: attacked_img vs ori_img')
 
-        #calculate MSE for each patch: mask_img vs attacked_img
-        mse_losses = calculate_patchwise_mse(attacked_img, mask_img, patch_size)
+    #calculate MSE for each patch: mask_img vs attacked_img
+    mse_losses, _ = calculate_patchwise_mse(attacked_img, mask_img, patch_size)
+    print("Average MSE loss (mask_img vs attacked_img):", np.mean(mse_losses))  # <-- printing average
         
-        #plot MSE for mask_img vs attacked_img
-        plot_mse_per_patch(mse_losses, save_path='out/mask_vs_attacked.png', title='Mean Squared Error for Each Patch: mask_img vs attacked_img')
+    #plot MSE for mask_img vs attacked_img
+    plot_mse_per_patch(mse_losses, top_patch_indexes, save_path='out/mask_vs_attacked.png', title='Mean Squared Error for Each Patch: mask_img vs attacked_img')
 
-        #calculate MSE for each patch: rec_img vs attacked_img
-        mse_losses = calculate_patchwise_mse(attacked_img, rec_img, patch_size)
+    #calculate MSE for each patch: rec_img vs attacked_img
+    mse_losses, _ = calculate_patchwise_mse(attacked_img, rec_img, patch_size)
+    print("Average MSE loss (rec_img vs attacked_img):", np.mean(mse_losses))  # <-- printing average
         
-        #plot MSE for rec_img vs attacked_img
-        plot_mse_per_patch(mse_losses, save_path='out/rec_vs_attacked.png', title='Mean Squared Error for Each Patch: rec_img vs attacked_img')
+    #plot MSE for rec_img vs attacked_img
+    plot_mse_per_patch(mse_losses, top_patch_indexes, save_path='out/rec_vs_attacked.png', title='Mean Squared Error for Each Patch: rec_img vs attacked_img')
 
-        #calculate MSE for each patch: rec_img vs ori_img
-        mse_losses = calculate_patchwise_mse(ori_img, rec_img, patch_size)
+    #calculate MSE for each patch: rec_img vs ori_img
+    mse_losses, _ = calculate_patchwise_mse(ori_img, rec_img, patch_size)
+    print("Average MSE loss (rec_img vs ori_img):", np.mean(mse_losses))  # <-- printing average
         
-        #plot MSE for rec_img vs ori_img
-        plot_mse_per_patch(mse_losses, save_path='out/rec_vs_ori.png', title='Mean Squared Error for Each Patch: rec_img vs ori_img')
-   
+    #plot MSE for rec_img vs ori_img
+    plot_mse_per_patch(mse_losses, top_patch_indexes, save_path='out/rec_vs_ori.png', title='Mean Squared Error for Each Patch: rec_img vs ori_img')
+
 
 def main(args):
     print(args)
