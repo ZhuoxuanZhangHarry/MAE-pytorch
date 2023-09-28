@@ -41,8 +41,8 @@ from timm.data.constants import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
 
 def get_args():
     parser = argparse.ArgumentParser('MAE visualization reconstruction script', add_help=False)
-    parser.add_argument('original_img_path', type=str, help='input original image path')
-    parser.add_argument('attacked_img_path', type=str, help='input attacked image path')
+    parser.add_argument('img_path', type=str, help='input image path')
+    parser.add_argument('img_type', type=str, help='original/attacked')
     parser.add_argument('save_path', type=str, help='save image path')
     parser.add_argument('model_path', type=str, help='checkpoint path of model')
 
@@ -83,37 +83,27 @@ def compute_pixelwise_accuracy(original, reconstructed, threshold=0.05):
     
     return accuracy.item()
 
-def calculate_patchwise_mse(ori_img, mask_img, patch_size):
+def calculate_patchwise_mse(img, rec_img, patch_size):
     """Calculate Mean Squared Error for each patch."""
     mse_losses = []
     patch_indexes = []
-    for i in range(0, ori_img.shape[2], patch_size[0]):
-        for j in range(0, ori_img.shape[3], patch_size[1]):
-            patch_ori = ori_img[:, :, i:i+patch_size[0], j:j+patch_size[1]]
-            patch_mask = mask_img[:, :, i:i+patch_size[0], j:j+patch_size[1]]
+    for i in range(0, img.shape[2], patch_size[0]):
+        for j in range(0, img.shape[3], patch_size[1]):
+            patch_ori = img[:, :, i:i+patch_size[0], j:j+patch_size[1]]
+            patch_rec = rec_img[:, :, i:i+patch_size[0], j:j+patch_size[1]]
             
-            mse = ((patch_ori - patch_mask) ** 2).mean().item()
+            mse = ((patch_ori - patch_rec) ** 2).mean().item()
             mse_losses.append(mse)
             patch_indexes.append((i, j))
     
-    # Get indexes of patches with top 7.5% highest MSE
-    top_mse_count = int(0.075 * len(mse_losses))
-    top_mse_indexes = sorted(range(len(mse_losses)), key=lambda i: mse_losses[i], reverse=True)[:top_mse_count]
-    top_patch_indexes = [patch_indexes[i] for i in top_mse_indexes]
-    
-    return mse_losses, top_patch_indexes
+    return mse_losses
 
 
-def plot_mse_per_patch(mse_losses, top_patch_indexes, save_path, title):
+def plot_mse_per_patch(mse_losses, save_path, title):
     """Plot Mean Squared Error for each patch."""
     plt.figure(figsize=(10, 6))
     plt.plot(mse_losses, marker='o')
     
-    # Highlight the patches with the highest MSE
-    x_index = [x[0] for x in top_patch_indexes]
-    plt.axvline(x=min(x_index), color='red', linestyle='--')
-    plt.axvline(x=max(x_index), color='red', linestyle='--')
-
     plt.title(title)
     plt.xlabel('Patch Index')
     plt.ylabel('MSE')
@@ -121,49 +111,23 @@ def plot_mse_per_patch(mse_losses, top_patch_indexes, save_path, title):
     plt.savefig(save_path, bbox_inches='tight', dpi=300)
 
 
-def assessment(ori_img, attacked_img, mask_img, rec_img, patch_size):
+def assessment(img, rec_img, img_type, patch_size):
     #calculate accuracy
-    print("Accuracy: ", compute_pixelwise_accuracy(ori_img, rec_img))
-
-    # calculate MSE for each patch: attacked_img vs ori_img
-    mse_losses, top_patch_indexes = calculate_patchwise_mse(ori_img, attacked_img, patch_size)
-    print("Average MSE loss (attacked_img vs ori_img):", np.mean(mse_losses))  # <-- printing average
-        
-    # plot MSE for attacked_img vs ori_img
-    plot_mse_per_patch(mse_losses, top_patch_indexes, save_path='out/attacked_vs_ori.png', title='Mean Squared Error for Each Patch: attacked_img vs ori_img')
-
-    #calculate MSE for each patch: mask_img vs attacked_img
-    mse_losses, _ = calculate_patchwise_mse(attacked_img, mask_img, patch_size)
-    print("Average MSE loss (mask_img vs attacked_img):", np.mean(mse_losses))  # <-- printing average
-        
-    #plot MSE for mask_img vs attacked_img
-    plot_mse_per_patch(mse_losses, top_patch_indexes, save_path='out/mask_vs_attacked.png', title='Mean Squared Error for Each Patch: mask_img vs attacked_img')
-
-    #calculate MSE for each patch: rec_img vs attacked_img
-    mse_losses, _ = calculate_patchwise_mse(attacked_img, rec_img, patch_size)
-    print("Average MSE loss (rec_img vs attacked_img):", np.mean(mse_losses))  # <-- printing average
-        
-    #plot MSE for rec_img vs attacked_img
-    plot_mse_per_patch(mse_losses, top_patch_indexes, save_path='out/rec_vs_attacked.png', title='Mean Squared Error for Each Patch: rec_img vs attacked_img')
+    print(f"Accuracy of rec_{img_type}_vs_ori_{img_type}: ", compute_pixelwise_accuracy(img, rec_img))
 
     #calculate MSE for each patch: rec_img vs ori_img
-    mse_losses, _ = calculate_patchwise_mse(ori_img, rec_img, patch_size)
-    print("Average MSE loss (rec_img vs ori_img):", np.mean(mse_losses))  # <-- printing average
-        
-    #plot MSE for rec_img vs ori_img
-    plot_mse_per_patch(mse_losses, top_patch_indexes, save_path='out/rec_vs_ori.png', title='Mean Squared Error for Each Patch: rec_img vs ori_img')
+    mse_losses = calculate_patchwise_mse(img, rec_img, patch_size)
+    print(f"Average MSE loss (rec_{img_type}_vs_ori_{img_type}):", np.mean(mse_losses))
 
+     #plot MSE for rec_img vs img
+    plot_mse_per_patch(mse_losses, save_path=f'out/rec_{img_type}_vs_ori_{img_type}.png', title=f'Mean Squared Error for Each Patch: rec_{img_type}_img vs ori_{img_type}_img')
 
 def main(args):
     print(args)
 
     device = torch.device(args.device)
     cudnn.benchmark = True
-
-    ori_img = None
-    attacked_img = None
-    mask_img = None
-    rec_img = None
+    img_type = args.img_type
 
     model = get_model(args)
     patch_size = model.encoder.patch_embed.patch_size
@@ -176,50 +140,32 @@ def main(args):
     model.load_state_dict(checkpoint['model'])
     model.eval()
 
-    with open(args.original_img_path, 'rb') as f:
-        ori_img = Image.open(f)
-        ori_img.convert('RGB')
-        ori_img = ori_img.resize((224, 224))  # Resize the image
-        print("ori_img path:", args.original_img_path)
+    with open(args.img_path, 'rb') as f:
+        img = Image.open(f)
+        img.convert('RGB')
+        if img_type == 'original': 
+            img = img.resize((224, 224))  # Resize the image
+        print("img path:", args.img_path)
 
     transforms = DataAugmentationForMAE(args)
-    ori_img, _ = transforms(ori_img)
-
-    with open(args.attacked_img_path, 'rb') as f:
-        attacked_img = Image.open(f)
-        attacked_img.convert('RGB')
-        print("attacked_img path:", args.attacked_img_path)
-
-    transforms = DataAugmentationForMAE(args)
-    attacked_img, bool_masked_pos = transforms(attacked_img)
+    img, bool_masked_pos = transforms(img)
     bool_masked_pos = torch.from_numpy(bool_masked_pos)
 
     with torch.no_grad():
-        ori_img = ori_img[None, :]
-        ori_img = ori_img.to(device, non_blocking=True)
-
-        attacked_img = attacked_img[None, :]
+        img = img[None, :]
         bool_masked_pos = bool_masked_pos[None, :]
-        attacked_img = attacked_img.to(device, non_blocking=True)
+        img = img.to(device, non_blocking=True)
         bool_masked_pos = bool_masked_pos.to(device, non_blocking=True).flatten(1).to(torch.bool)
-        outputs = model(attacked_img, bool_masked_pos)
+        outputs = model(img, bool_masked_pos)
 
-        #save ori_img
+        #save original img
         mean = torch.as_tensor(IMAGENET_DEFAULT_MEAN).to(device)[None, :, None, None]
         std = torch.as_tensor(IMAGENET_DEFAULT_STD).to(device)[None, :, None, None]
-        ori_img = ori_img * std + mean  # in [0, 1]
+        ori_img = img * std + mean  # in [0, 1]
         img = ToPILImage()(ori_img[0, :])
-        img.save(f"{args.save_path}/ori_img.jpg")
-        
+        img.save(f"{args.save_path}/ori_{img_type}_img.jpg")
 
-        #save attacked_img
-        mean = torch.as_tensor(IMAGENET_DEFAULT_MEAN).to(device)[None, :, None, None]
-        std = torch.as_tensor(IMAGENET_DEFAULT_STD).to(device)[None, :, None, None]
-        attacked_img = attacked_img * std + mean  # in [0, 1]
-        img = ToPILImage()(attacked_img[0, :])
-        img.save(f"{args.save_path}/attacked_img.jpg")
-
-        img_squeeze = rearrange(attacked_img, 'b c (h p1) (w p2) -> b (h w) (p1 p2) c', p1=patch_size[0], p2=patch_size[0])
+        img_squeeze = rearrange(ori_img, 'b c (h p1) (w p2) -> b (h w) (p1 p2) c', p1=patch_size[0], p2=patch_size[0])
         img_norm = (img_squeeze - img_squeeze.mean(dim=-2, keepdim=True)) / (img_squeeze.var(dim=-2, unbiased=True, keepdim=True).sqrt() + 1e-6)
         img_patch = rearrange(img_norm, 'b n p c -> b n (p c)')
         img_patch[bool_masked_pos] = outputs
@@ -236,17 +182,16 @@ def main(args):
         rec_img = rec_img * (img_squeeze.var(dim=-2, unbiased=True, keepdim=True).sqrt() + 1e-6) + img_squeeze.mean(dim=-2, keepdim=True)
         rec_img = rearrange(rec_img, 'b (h w) (p1 p2) c -> b c (h p1) (w p2)', p1=patch_size[0], p2=patch_size[1], h=14, w=14)
         img = ToPILImage()(rec_img[0, :].clip(0,0.996))
-        img.save(f"{args.save_path}/rec_img.jpg")
+        img.save(f"{args.save_path}/rec_{img_type}_img.jpg")
 
-         #save random mask img
-        mask_img = rec_img * mask
-        img = ToPILImage()(mask_img[0, :])
-        img.save(f"{args.save_path}/mask_img.jpg")
-        
-        #ensure shapes are the same
-        assert(ori_img.shape == rec_img.shape == mask_img.shape == rec_img.shape)
+        #save random mask img
+        img_mask = rec_img * mask
+        img = ToPILImage()(img_mask[0, :])
+        img.save(f"{args.save_path}/mask_{img_type}_img.jpg")
 
-        assessment(ori_img, attacked_img, mask_img, rec_img, patch_size)
+        assessment(ori_img, rec_img, img_type, patch_size)
+
+        print("----------------------------------------------------------")
         
 
 

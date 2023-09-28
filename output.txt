@@ -1,10 +1,4 @@
-Namespace(attacked_img_path='files/attacked_ILSVRC2012_val_00018075.JPEG', device='cuda:0', drop_path=0.0, imagenet_default_mean_and_std=True, input_size=224, mask_ratio=0.75, model='pretrain_mae_base_patch16_224', model_path='paths/pretrain_mae_vit_base_mask_0.75_400e.pth', original_img_path='files/ILSVRC2012_val_00018075.JPEG', save_path='out/')
+Namespace(device='cuda:0', drop_path=0.0, imagenet_default_mean_and_std=True, img_path='files/ILSVRC2012_val_00018075.JPEG', img_type='files/attacked_ILSVRC2012_val_00018075.JPEG', input_size=224, mask_ratio=0.75, model='pretrain_mae_base_patch16_224', model_path='paths/pretrain_mae_vit_base_mask_0.75_400e.pth', save_path='out/')
 Creating model: pretrain_mae_base_patch16_224
 Patch size = (16, 16)
-ori_img path: files/ILSVRC2012_val_00018075.JPEG
-attacked_img path: files/attacked_ILSVRC2012_val_00018075.JPEG
-Accuracy:  0.4180285334587097
-Average MSE loss (attacked_img vs ori_img): 0.01527615046967296
-Average MSE loss (mask_img vs attacked_img): 0.1323318464695761
-Average MSE loss (rec_img vs attacked_img): 0.006595250757973008
-Average MSE loss (rec_img vs ori_img): 0.018083128112971743
+img path: files/ILSVRC2012_val_00018075.JPEG
