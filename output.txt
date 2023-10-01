@@ -2,13 +2,13 @@ Namespace(device='cuda:0', drop_path=0.0, imagenet_default_mean_and_std=True, im
 Creating model: pretrain_mae_base_patch16_224
 Patch size = (16, 16)
 img path: files/ILSVRC2012_val_00018075.JPEG
-Accuracy of rec_original_vs_ori_original:  0.7029522657394409
-Average MSE loss (rec_original_vs_ori_original): 0.005621340047202134
+Accuracy of rec_original_vs_ori_original:  0.7311397194862366
+Average MSE loss (rec_original_vs_ori_original): 0.005348950076207689
 ----------------------------------------------------------
 Namespace(device='cuda:0', drop_path=0.0, imagenet_default_mean_and_std=True, img_path='files/attacked_ILSVRC2012_val_00018075.JPEG', img_type='attacked', input_size=224, mask_ratio=0.75, model='pretrain_mae_base_patch16_224', model_path='paths/pretrain_mae_vit_base_mask_0.75_400e.pth', save_path='out/')
 Creating model: pretrain_mae_base_patch16_224
 Patch size = (16, 16)
 img path: files/attacked_ILSVRC2012_val_00018075.JPEG
-Accuracy of rec_attacked_vs_ori_attacked:  0.7120801210403442
-Average MSE loss (rec_attacked_vs_ori_attacked): 0.008983953155193935
+Accuracy of rec_attacked_vs_ori_attacked:  0.7271803021430969
+Average MSE loss (rec_attacked_vs_ori_attacked): 0.009026801446267127
 ----------------------------------------------------------

@@ -108,18 +108,19 @@ def plot_mse_per_patch(mse_losses, save_path, title):
     plt.xlabel('Patch Index')
     plt.ylabel('MSE')
     plt.grid(True)
+    plt.ylim(0, 0.1)  # Manually setting y-axis range
     plt.savefig(save_path, bbox_inches='tight', dpi=300)
 
 
 def assessment(img, rec_img, img_type, patch_size):
-    #calculate accuracy
     print(f"Accuracy of rec_{img_type}_vs_ori_{img_type}: ", compute_pixelwise_accuracy(img, rec_img))
 
-    #calculate MSE for each patch: rec_img vs ori_img
     mse_losses = calculate_patchwise_mse(img, rec_img, patch_size)
     print(f"Average MSE loss (rec_{img_type}_vs_ori_{img_type}):", np.mean(mse_losses))
 
-     #plot MSE for rec_img vs img
+    # calculate y-range for the MSE plots so they share the same y-axis range:
+    y_range = (min(mse_losses), max(mse_losses))
+
     plot_mse_per_patch(mse_losses, save_path=f'out/rec_{img_type}_vs_ori_{img_type}.png', title=f'Mean Squared Error for Each Patch: rec_{img_type}_img vs ori_{img_type}_img')
 
 def main(args):
