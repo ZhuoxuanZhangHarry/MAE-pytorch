@@ -93,20 +93,31 @@ def compute_pixelwise_accuracy(original, reconstructed, threshold=0.05):
     
     return accuracy.item()
 
-def calculate_patchwise_mse(img, rec_img, patch_size):
+def calculate_patchwise_mse(img, rec_img, bool_masked_pos, patch_size):
     """Calculate Mean Squared Error for each patch."""
     mse_losses = []
-    patch_indexes = []
-    for i in range(0, img.shape[2], patch_size[0]):
-        for j in range(0, img.shape[3], patch_size[1]):
-            patch_ori = img[:, :, i:i+patch_size[0], j:j+patch_size[1]]
-            patch_rec = rec_img[:, :, i:i+patch_size[0], j:j+patch_size[1]]
-            
-            mse = ((patch_ori - patch_rec) ** 2).mean().item()
-            mse_losses.append(mse)
-            patch_indexes.append((i, j))
+    masked_losses = []  # Store MSE for only masked patches
     
-    return mse_losses
+    patches_per_side = img.shape[2] // patch_size[0]
+    
+    for idx in range(patches_per_side * patches_per_side):
+        row = idx // patches_per_side
+        col = idx % patches_per_side
+        i, j = row * patch_size[0], col * patch_size[1]
+        patch_ori = img[:, :, i:i+patch_size[0], j:j+patch_size[1]]
+        patch_rec = rec_img[:, :, i:i+patch_size[0], j:j+patch_size[1]]
+
+        mse = ((patch_ori - patch_rec) ** 2).mean().item()
+
+        if bool_masked_pos[0, idx]:  # Only calculate MSE for masked patches
+            mse_losses.append(mse)
+            masked_losses.append(mse)
+        else:
+            mse_losses.append(float('nan'))  # Placeholder for non-masked patches with NaN
+
+    avg_masked_mse = sum(masked_losses) / len(masked_losses) if masked_losses else None
+    return mse_losses, avg_masked_mse
+
 
 
 def plot_mse_per_patch(mse_losses, save_path, title, y_range):
@@ -122,16 +133,21 @@ def plot_mse_per_patch(mse_losses, save_path, title, y_range):
     plt.savefig(save_path, bbox_inches='tight', dpi=300)
 
 
-def assessment(img, rec_img, img_type, patch_size):
+def assessment(img, rec_img, bool_masked_pos, img_type, patch_size):
     print(f"Accuracy of rec_{img_type}_vs_ori_{img_type}: ", compute_pixelwise_accuracy(img, rec_img))
 
-    mse_losses = calculate_patchwise_mse(img, rec_img, patch_size)
+    mse_losses, avg_masked_mse = calculate_patchwise_mse(img, rec_img, bool_masked_pos, patch_size)
+
+    if avg_masked_mse is not None:
+        print(f"Average MSE loss on masked patches (rec_{img_type}_vs_ori_{img_type}):", avg_masked_mse)
+    else:
+        print("No masked patches detected.")
     print(f"Average MSE loss (rec_{img_type}_vs_ori_{img_type}):", np.mean(mse_losses))
 
     # calculate y-range for the MSE plots so they share the same y-axis range:
     y_range = (min(mse_losses), max(mse_losses))
 
-    plot_mse_per_patch(mse_losses, save_path=f'out/rec_{img_type}_vs_ori_{img_type}.png', title=f'Mean Squared Error for Each Patch: rec_{img_type}_img vs ori_{img_type}_img', y_range=y_range)
+    plot_mse_per_patch(mse_losses, save_path=f'out/rec_{img_type}_vs_ori_{img_type}.png', title=f'Mean Squared Error for Masked Patch: rec_{img_type}_img vs ori_{img_type}_img', y_range=y_range)
 
 def main(args):
     print(args)
@@ -200,7 +216,7 @@ def main(args):
         img = ToPILImage()(img_mask[0, :])
         img.save(f"{args.save_path}/mask_{img_type}_img.jpg")
 
-        assessment(ori_img, rec_img, img_type, patch_size)
+        assessment(ori_img, rec_img, bool_masked_pos, img_type, patch_size)
 
         print("----------------------------------------------------------")
         
