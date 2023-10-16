@@ -73,6 +73,16 @@ def get_model(args):
 
     return model
 
+def set_seed(seed=42):
+    import random
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
 def compute_pixelwise_accuracy(original, reconstructed, threshold=0.05):
     abs_diff = torch.abs(original - reconstructed)
 
@@ -99,7 +109,7 @@ def calculate_patchwise_mse(img, rec_img, patch_size):
     return mse_losses
 
 
-def plot_mse_per_patch(mse_losses, save_path, title):
+def plot_mse_per_patch(mse_losses, save_path, title, y_range):
     """Plot Mean Squared Error for each patch."""
     plt.figure(figsize=(10, 6))
     plt.plot(mse_losses, marker='o')
@@ -108,7 +118,7 @@ def plot_mse_per_patch(mse_losses, save_path, title):
     plt.xlabel('Patch Index')
     plt.ylabel('MSE')
     plt.grid(True)
-    plt.ylim(0, 0.1)  # Manually setting y-axis range
+    plt.ylim(y_range)  # Manually setting y-axis range
     plt.savefig(save_path, bbox_inches='tight', dpi=300)
 
 
@@ -121,11 +131,11 @@ def assessment(img, rec_img, img_type, patch_size):
     # calculate y-range for the MSE plots so they share the same y-axis range:
     y_range = (min(mse_losses), max(mse_losses))
 
-    plot_mse_per_patch(mse_losses, save_path=f'out/rec_{img_type}_vs_ori_{img_type}.png', title=f'Mean Squared Error for Each Patch: rec_{img_type}_img vs ori_{img_type}_img')
+    plot_mse_per_patch(mse_losses, save_path=f'out/rec_{img_type}_vs_ori_{img_type}.png', title=f'Mean Squared Error for Each Patch: rec_{img_type}_img vs ori_{img_type}_img', y_range=y_range)
 
 def main(args):
     print(args)
-
+    # set_seed(42)
     device = torch.device(args.device)
     cudnn.benchmark = True
     img_type = args.img_type
@@ -198,4 +208,5 @@ def main(args):
 
 if __name__ == '__main__':
     opts = get_args()
+    set_seed(42)
     main(opts)
